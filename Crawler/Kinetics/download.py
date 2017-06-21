@@ -1,3 +1,5 @@
+from __future__ import print_function
+
 import argparse
 import fnmatch
 import glob
@@ -63,6 +65,7 @@ def download_clip(video_identifier, output_filename,
     assert isinstance(output_filename, str), 'output_filename must be string'
     assert len(video_identifier) == 11, 'video_identifier must have length 11'
 
+    print('{}: starting downloader for {}'.format(video_identifier, video_identifier))
     status = False
     # Construct command line for getting the direct video link.
     tmp_filename = os.path.join(tmp_dir,
@@ -81,8 +84,10 @@ def download_clip(video_identifier, output_filename,
          except subprocess.CalledProcessError as err:
             attempts += 1
             if attempts == num_attempts:
+	        print("{}: could not download to {}".format(video_identifier, tmp_filename))
                 return status, err.output
          else:
+	    print("{}: downloaded to {}".format(video_identifier, tmp_filename))
             break
             
     tmp_filename = glob.glob('%s*' % tmp_filename.split('.')[0])[0]
@@ -100,10 +105,14 @@ def download_clip(video_identifier, output_filename,
         output = subprocess.check_output(command, shell=True,
                                          stderr=subprocess.STDOUT)
     except subprocess.CalledProcessError as err:
+        print("{}: error when trimming video {}".format(video_identifier, output_filename))
         return status, err.output
+    else:
+        print("{}: trimmed video {} successfully".format(video_identifier, output_filename))
 
     # Check if the video was successfully saved.
     status = os.path.exists(output_filename)
+    print("{}: Removing {}".format(video_identifier, tmp_filename))
     os.remove(tmp_filename)
     return status, 'Downloaded'
 
@@ -156,18 +165,22 @@ def main(input_csv, output_dir,
     # Creates folders where videos will be saved later.
     label_to_dir = create_video_folders(dataset, output_dir, tmp_dir)
 
-    # Download all clips.
-    if num_jobs==1:
-        status_lst = []
-        for i, row in dataset.iterrows():
-            status_lst.append(download_clip_wrapper(row, label_to_dir, 
-                                                    trim_format, tmp_dir))
-    else:
-        status_lst = Parallel(n_jobs=num_jobs)(delayed(download_clip_wrapper)(
-            row, label_to_dir,
-            trim_format, tmp_dir) for i, row in dataset.iterrows())
+    try:
+        # Download all clips.
+        if num_jobs==1:
+            status_lst = []
+            for i, row in dataset.iterrows():
+                status_lst.append(download_clip_wrapper(row, label_to_dir, 
+                                                        trim_format, tmp_dir))
+        else:
+            status_lst = Parallel(n_jobs=num_jobs)(delayed(download_clip_wrapper)(
+                row, label_to_dir,
+                trim_format, tmp_dir) for i, row in dataset.iterrows())
+    except KeyboardInterrupt:
+        print("Interrupted.")
 
     # Clean tmp dir.
+    print("Removing {}".format(tmp_dir))
     shutil.rmtree(tmp_dir)
 
     # Save download report.
@@ -189,4 +202,5 @@ if __name__ == '__main__':
                          'videoid_%0xd(start_time)_%0xd(end_time).mp4'))
     p.add_argument('-n', '--num-jobs', type=int, default=24)
     p.add_argument('-t', '--tmp-dir', type=str, default='/tmp/kinetics')
+    print('Starting...')
     main(**vars(p.parse_args()))
