@@ -70,7 +70,7 @@ def download_clip(video_identifier, output_filename,
     assert isinstance(output_filename, str), 'output_filename must be string'
     assert len(video_identifier) == 11, 'video_identifier must have length 11'
 
-    logger.info('{vid_id}: starting downloader for {vid_id}'.format(video_identifier))
+    logger.info('{vid_id}: starting downloader for {vid_id}'.format(vid_id=video_identifier))
     status = False
     # Construct command line for getting the direct video link.
     tmp_filename = os.path.join(tmp_dir,
